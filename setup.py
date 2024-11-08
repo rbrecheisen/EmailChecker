@@ -49,7 +49,7 @@ setup(
     test_suite='tests',
     entry_points={
         'console_scripts': [
-            'emailchecker=emailchecker.main:main',
+            'email-checker=emailchecker.main:main',
         ],
     },
     version=VERSION,

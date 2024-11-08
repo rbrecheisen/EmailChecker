@@ -6,12 +6,8 @@ set PACKAGE=emailchecker
 where twine >nul 2>&1
 if %errorlevel% neq 0 (
   echo "You do not seem to have Twine installed (wrong venv?). It is needed to upload to PyPI"
-  echo "Type 'install' to install it and continue or any other key to quit"
-  set /p line=
-  if not "%line%" == "install" (
-    exit /b 0
-  )
-  python -m pip install twine wheel
+  echo "Run python -m pip install twine wheel"
+  exit /b 0
 )
 
 set CMD=%1
