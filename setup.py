@@ -5,10 +5,10 @@ import os
 from setuptools import setup, find_packages
 
 requirements = []
-with open('requirements.txt', 'r') as f:
-    for line in f.readlines():
-        line = line.strip()
-        requirements.append(line)
+# with open('requirements.txt', 'r') as f:
+#     for line in f.readlines():
+#         line = line.strip()
+#         requirements.append(line)
 
 setup_requirements = []
 
