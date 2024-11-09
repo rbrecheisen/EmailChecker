@@ -1,72 +1,53 @@
 import os
 import time
-import email
-import imaplib
+import argparse
 
-from email.header import decode_header
-
-
-def send_response(message, sender, receiver, password):
-    import smtplib
-    from email.mime.text import MIMEText
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-    sender_email = sender
-    receiver_email = receiver
-    password = password
-    msg = MIMEText(message)
-    msg["Subject"] = "EmailChecker response"
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(sender_email, password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
+from pathlib import Path
 
 
-def check_email(sender, receiver, password, imap_server):
-    mail = imaplib.IMAP4_SSL(imap_server)
-    mail.login(sender, password)
-    mail.select("inbox")
-    status, messages = mail.search(None, 'UNSEEN')
-    if status != "OK":
-        return
-    for num in messages[0].split():
-        status, msg_data = mail.fetch(num, '(RFC822)')
-        msg = email.message_from_bytes(msg_data[0][1])
-        subject, encoding = decode_header(msg["Subject"])[0]
-        if isinstance(subject, bytes):
-            subject = subject.decode(encoding if encoding else "utf-8")
-        from_ = msg.get("From")
-        print(f"Processing email from {from_} with subject: {subject}")
-        if subject.startswith('EmailChecker'):
-            items = [x.trim() for x in subject.split(' ')]
-            application, nr_lines, log_mode = items[1], items[2], 'error'
-            if len(items) == 4:
-                log_mode = items[3]
-            print(f'Found following command: "EmailChecker {application} {nr_lines}, {log_mode}')
-            send_response('This is my response!', sender, receiver, password)
-    mail.close()
-    mail.logout()
+class EmailResponseSender:
+    def execute(self, message, sender, sender_password, receiver, smpt_server):
+        print(f'Sending response message "{message}" to {receiver}...')
 
+
+class EmailChecker:
+    def execute(self, sender, sender_password, receiver, imap_server):
+        return 'RESPONSE'
 
 
 def main():
-    print(f'Running EmailChecker...')
-    print('Getting email credentials for Gmail IMAP server...')
-    sender = os.getenv('EMAILCHECKER_SENDER', None)
-    password = os.getenv('EMAILCHECKER_PASSWORD', None)
-    receiver = os.getenv('EMAILCHECKER_RECEIVER', None)
-    imap_server = 'imap.gmail.com'
-    print(f'Found following credentials:')
-    print(f'Sender: {sender}, receiver: {receiver}, password: {password}, IMAP server: {imap_server}')
-    if not sender or not password:
-        raise RuntimeError('Could not load sender, receiver or password from environment')
-    time_to_wait = int(os.getenv('EMAILCHECKER_TIME_TO_WAIT', 60))
+    # Define arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('computer_name', help='Computer name')
+    parser.add_argument('--sender', help='Username of email account to use for checking emails (default: ralph.brecheisen@gmail.com)', default='ralph.brecheisen@gmail.com')
+    parser.add_argument('--sender_password', help='Password of email account to use for checking email (if not provided will be loaded from file $HOME/emailchecker-password.txt)')
+    parser.add_argument('--receiver', help='Email address to use to send responses (default: r.brecheisen@maastrichtuniversity.nl)', default='r.brecheisen@maastrichtuniversity.nl')
+    parser.add_argument('--imap_server', help='IMAP server to use for checking emails (default: imap.gmail.com)', default='imap.gmail.com')
+    parser.add_argument('--smtp_server', help='SMTP server to use for sending responses (default: smtp.gmail.com)', default='smtp.gmail.com')
+    parser.add_argument('--interval', help='Interval in seconds to check for email (default: 5)', default=5)
+    parser.add_argument('--print_args', help='Prints argument values before running email checker (default: "false"). To enable, set to "true" or "yes"', default='false')
+    args = parser.parse_args()
+    # Check arguments and load password if not provided
+    if not args.sender_password:
+        with open(os.path.join(Path.home(), 'emailchecker-password.txt'), 'r') as f:
+            args.sender_password = f.readline().strip()
+    if isinstance(args.interval, str):
+        try:
+            args.interval = int(args.interval)
+        except ValueError:
+            print(f'ERROR: --interval must be an integer value')
+            return
+    args.print_args = True if args.print_args == 'true' or args.print_args == 'yes' else False
+    if args.print_args:
+        print(args)
+    # Start checking emails every "interval"
+    print(f'Starting email checker every {args.interval} seconds (stop using Ctrl+C)...')
     while True:
-        print('Checking email...')
-        check_email(sender, receiver, password, imap_server)
-        time.sleep(time_to_wait)
+        checker = EmailChecker()
+        reponse_message = checker.execute(args.sender, args.sender_password, args.receiver, args.imap_server)
+        sender = EmailResponseSender()
+        sender.execute(reponse_message, args.sender, args. sender_password, args.receiver, args.smtp_server)
+        time.sleep(args.interval)
 
 
 if __name__ == '__main__':
