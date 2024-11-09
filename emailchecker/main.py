@@ -1,7 +1,10 @@
 import os
 import time
+import email
+import imaplib
 import argparse
 
+from email.header import decode_header
 from pathlib import Path
 
 
@@ -11,8 +14,26 @@ class EmailResponseSender:
 
 
 class EmailChecker:
-    def execute(self, sender, sender_password, receiver, imap_server):
-        return 'RESPONSE'
+    def execute(self, sender, sender_password, imap_server):
+        mail = imaplib.IMAP4_SSL(imap_server)
+        mail.login(sender, sender_password)
+        mail.select('inbox')
+        status, messages = mail.search(None, 'UNSEEN')
+        if status != 'OK':
+            return
+        response_message = None
+        for num in messages[0].split():
+            status, msg_data = mail.fetch(num, '(RFC822)')
+            msg = email.message_from_bytes(msg_data[0][1])
+            subject, encoding = decode_header(msg['Subject'])[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding if encoding else 'utf-8')
+            x = msg.get('From')
+            if subject.lower().startswith('emailchecker'):
+                response_message = f'Found command {subject} from {x}!'
+        mail.close()
+        mail.logout()
+        return response_message
 
 
 def main():
@@ -40,13 +61,14 @@ def main():
     args.print_args = True if args.print_args == 'true' or args.print_args == 'yes' else False
     if args.print_args:
         print(args)
-    # Start checking emails every "interval"
+    # Start checking emails every 'interval'
     print(f'Starting email checker every {args.interval} seconds (stop using Ctrl+C)...')
     while True:
         checker = EmailChecker()
-        reponse_message = checker.execute(args.sender, args.sender_password, args.receiver, args.imap_server)
-        sender = EmailResponseSender()
-        sender.execute(reponse_message, args.sender, args. sender_password, args.receiver, args.smtp_server)
+        reponse_message = checker.execute(args.sender, args.sender_password, args.imap_server)
+        if reponse_message:
+            sender = EmailResponseSender()
+            sender.execute(reponse_message, args.sender, args. sender_password, args.receiver, args.smtp_server)
         time.sleep(args.interval)
 
 
