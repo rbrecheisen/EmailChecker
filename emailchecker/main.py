@@ -30,6 +30,7 @@ class EmailChecker:
                 subject = subject.decode(encoding if encoding else 'utf-8')
             x = msg.get('From')
             if subject.lower().startswith('emailchecker'):
+                # TODO: Read log files from os.path.join(tempfile.gettempdir(), 'emailchecker/logs')
                 response_message = f'Found command {subject} from {x}!'
         mail.close()
         mail.logout()
